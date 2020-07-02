@@ -1,0 +1,29 @@
+# This playbook assumes you are already logged in to OpenShift as a cluster administrator
+
+- name: Undeploy Jenkins for GitOps
+  hosts: localhost
+  tasks:
+
+  - name: Revoke cluster-administrator privileges from the Jenkins service account
+    k8s:
+      state: absent
+      src: "{{ playbook_dir + '/resources/' + item }}"
+    loop:
+    - jenkins-cluster-admin.yaml
+
+  - name: Remove the project used for Jenkins
+    k8s:
+      state: absent
+      api_version: project.openshift.io/v1
+      kind: Project
+      name: gitops-review
+  
+  - name: Wait until the project is really gone
+    k8s_info:
+      api_version: project.openshift.io/v1
+      kind: Project
+      name: gitops-review
+    register: project
+    until: not project.resources
+    retries: 60
+    delay: 3
