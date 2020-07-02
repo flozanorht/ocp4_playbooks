@@ -1,0 +1,19 @@
+# This playbook assumes you are already logged in to OpenShift as a cluster administrator
+
+- name: Waits until Jenkins is Ready and Running
+  hosts: localhost
+  tasks:
+
+  # I would prefer waiting on the Available condition to mimic oc rollout and oc wait
+
+  - name: Wait until Jenkins is available
+    k8s_info:
+      #api: apps.openshift.io/v1
+      kind: DeploymentConfig
+      name: jenkins
+      namespace: gitops-review
+    register: jenkins_dc
+    until: jenkins_dc.resources[0].status.availableReplicas == 1
+    retries: 90
+    delay: 3
+  
