@@ -34,6 +34,7 @@
       name: jenkins
       namespace: gitops-review
     register: jenkins_dc
+    #XXX I would prefer to check on the "Available" condition to mimic oc wait and oc rollout status
     until: jenkins_dc.resources[0].status.availableReplicas > 0
     retries: 60
     delay: 5
