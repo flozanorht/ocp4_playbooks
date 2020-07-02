@@ -34,6 +34,6 @@
       name: jenkins
       namespace: gitops-review
     register: jenkins_dc
-    until: jenkins_dc.resources[0].status.availableReplicas == 1
+    until: jenkins_dc.resources[0].status.availableReplicas > 0
     retries: 60
     delay: 5
