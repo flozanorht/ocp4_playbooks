@@ -4,9 +4,11 @@
 - name: Deploy a Hello, World application into a new project on OpenShift
   hosts: localhost
   gather_facts: no
+  become: no
 
   vars:
     namespace: hello-nginx
+
 
   module_defaults:
     group/k8s:
