@@ -35,7 +35,7 @@
           metadata:
             name: "{{ namespace }}"
           description: Project to host the hello, word application
-      when: project.resources is not defined
+      when: project.resources[0] is not defined
     
     #XXX Just adding "wait" here did not prevent uri from failing the first few attempts
     #XXX the pod shows as ready and running, so it is a failure of the k8s module or
