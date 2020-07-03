@@ -1,0 +1,101 @@
+# Should work for any user that can create projects in OpenShift
+# Does not require cluster administrator privileges but requires that the user logs in first
+
+- name: Deploy a Hello, World application into a new project on OpenShift
+  hosts: localhost
+  gather_facts: no
+
+  vars:
+    namespace: hello-nginx
+
+  module_defaults:
+    group/k8s:
+      namespace: "{{ namespace }}"
+
+  tasks:
+
+    - name: Check if project already exists
+      k8s_info:
+        api_version: project.openshift.io/v1
+        kind: Project
+        name: "{{ namespace }}"
+      register: project
+      failed_when: false
+      changed_when: false
+
+    # Fails if the project already exists.
+    # The fact that OpenShift uses one resource type to create another one breaks k8s module assumptions
+
+    - name: Create project
+      k8s:
+        state: present
+        definition:
+          apiVersion: project.openshift.io/v1
+          kind: ProjectRequest
+          metadata:
+            name: "{{ namespace }}"
+          description: Project to host the hello, word application
+      when: project.resources is not defined
+    
+    #XXX Just adding "wait" here did not prevent uri from failing the first few attempts
+    #XXX the pod shows as ready and running, so it is a failure of the k8s module or
+    #XXX it is just the router/service that needs some time?
+
+    - name: Create resources from the manifest
+      k8s:
+        state: present
+        src: "{{ playbook_dir + '/resources/hello.yml' }}"
+        wait: true
+
+    #XXX Adding this busy lopp on the deployment also did not prevent url from failing,
+    #XXX something must be wrong that I cannot see. Are my probes ok? oc status --suggest gives no recommendations
+    #XXX Sometimes fails if I remove wait: true from the previous k8s task because it looks up the deployment before it is created.
+    #XXX Looks like this one always succeeds the first attempt if the previous k8s module has wait: true
+
+    #- name: Wait until the app is available
+    #  k8s_info:
+    #    kind: Deployment
+    #    name: hello
+    #  register: deployment
+    #  #XXX I would prefer to check on the "Available" condition to mimic oc wait and oc rollout status
+    #  #XXX I didn't had time yet to find the syntax for that.
+    #  until: deployment.resources[0].status.availableReplicas is defined and deployment.resources[0].status.availableReplicas > 0
+    #  retries: 60
+    #  delay: 5
+
+    #XXX Had to disable because my k8s module and/or python libs are too old
+    #- name: Scale deployment up
+    #  k8s_scale:
+    #    kind: Deployment
+    #    name: hello
+    #    replicas: 3
+
+    - name: Get hostname of the route
+      k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        name: hello
+      register: route
+
+    - name: Display host name of the application
+      debug:
+        msg:
+          - "You can access the application from:"
+          - "{{ route.resources[0].spec.host }}"
+
+    #XXX How to get the returned page body without writing to a file?
+    #XXX I need some retries here even if I have wait: true on the k8s task
+
+    - name: Test access to the app
+      uri:
+        url: "http://{{ route.resources[0].spec.host }}"
+        dest: /tmp/hello.html
+      register: response
+      until: response.status == 200
+      retries: 10
+      delay: 5
+
+    - name: Display response of the application
+      debug:
+        msg: "{{ lookup('file', '/tmp/hello.html').splitlines() }}"
+
